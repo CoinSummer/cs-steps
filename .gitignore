@@ -1,0 +1,7 @@
+node_modules/
+vdb/*
+keystore/
+.DS_Store
+vct_transfer_batch/
+vct_transfer/
+logs/

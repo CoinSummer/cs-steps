@@ -1,3 +1,4 @@
+const redis = require("redis");
 const configloader = require('./config')
 const loggerLoader = require('./config/logger')
 
@@ -11,8 +12,12 @@ const { toWei, numberToHex, leftPad } = require('web3-utils')
 // PASSWORD='CsOkEX!23$' ENV=okex SUBMIT=N node main
 // --------------------- Config Params ------------------------------------------------ +
 
-const MyAddress           = '0x82deec6f97572b4a1d457778328a45aa72cbf9f2'
-
+const MyAddress            = '0x82deec6f97572b4a1d457778328a45aa72cbf9f2'
+const OKEX_kswapRouterAddr = '0xc3364A27f56b95f4bEB0742a7325D67a04D80942' 
+const OKEX_LiquidityPool   = '0xaEBa5C691aF30b7108D9C277d6BB47347387Dc13'
+const OKEX_lpTokenAddr     = '0x84ee6a98990010fe87d2c79822763fca584418e9'
+const OKEX_TokenUSDTAddr   = '0x382bB369d343125BfB2117af9c149795C6C65C50'
+const OKEX_TokenKstAddr    = '0xab0d1578216a545532882e420a8c61ea07b00b12' 
 const GasPriceGwei = 0.1
 // ------------------------------------------------------------------------------------ |
 const gasPrice = GasPriceGwei * Gwei
@@ -260,6 +265,33 @@ class Bee extends BaseApp {
        
         await tokenLP.methodSend('approve', [this.address, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'], this.owner, { value: 0, gasPrice, gas: 3000000 })
     }
+
+    async msgHandle(message) {
+        const msgData = JSON.parse(message)
+        
+        console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice)
+    }
+
+    async subscribe(channel) {
+        const that = this
+        const subscriber = redis.createClient({
+            host: 'localhost',
+            port: 6378,
+            db: 0,
+        });
+
+        subscriber.on("subscribe", function(channel, count) {
+            console.log('subscribe')
+        });
+
+        subscriber.on("message", async function(channel, message) {
+            console.log("Subscriber received message in channel '" + channel + "': " + message);
+            // await app.step2(OKEX_lpTokenAddr, OKEX_LiquidityPool, 6, OKEX_kswapRouterAddr, OKEX_TokenKstAddr, OKEX_TokenUSDTAddr)
+            await that.msgHandle(message)
+        });
+
+        subscriber.subscribe(channel);
+    }
 }
 
 async function run() {
@@ -271,23 +303,18 @@ async function run() {
         const util = new Util(config.url)
 
         const app = new Bee(util, config, 'IFOM', gasPrice)
-        const OKEX_kswapRouterAddr = '0xc3364A27f56b95f4bEB0742a7325D67a04D80942' 
-        const OKEX_LiquidityPool = '0xaEBa5C691aF30b7108D9C277d6BB47347387Dc13'
-        const OKEX_lpTokenAddr = '0x84ee6a98990010fe87d2c79822763fca584418e9'
-        const OKEX_TokenUSDTAddr = '0x382bB369d343125BfB2117af9c149795C6C65C50'
-        const OKEX_TokenKstAddr = '0xab0d1578216a545532882e420a8c61ea07b00b12' 
 
         app.loadContract('OKEX_LiquidityPool', OKEX_LiquidityPool)
         app.loadContract('OKEX_KswapRouter',   OKEX_kswapRouterAddr)
         app.loadToken(OKEX_lpTokenAddr)
-
+        await app.subscribe('pending')
         // await app.approve(OKEX_lpTokenAddr, OKEX_LiquidityPool)
         // await app.approve(OKEX_lpTokenAddr, OKEX_kswapRouterAddr)
         // await app.approve('0xab0d1578216a545532882e420a8c61ea07b00b12', OKEX_kswapRouterAddr)
 
         // await app.deposit('0x84ee6a98990010fe87d2c79822763fca584418e9', '0xaEBa5C691aF30b7108D9C277d6BB47347387Dc13', 1)
 
-        await app.step2(OKEX_lpTokenAddr, OKEX_LiquidityPool, 6, OKEX_kswapRouterAddr, OKEX_TokenKstAddr, OKEX_TokenUSDTAddr)
+        // await app.step2(OKEX_lpTokenAddr, OKEX_LiquidityPool, 6, OKEX_kswapRouterAddr, OKEX_TokenKstAddr, OKEX_TokenUSDTAddr)
 
         // await app.erc20Transfer('0xab0d1578216a545532882e420a8c61ea07b00b12', '975901324112876', '0xaD19E854b76BC971541002174d1CB8E5Bc1cea4a') 
         // await app.xSwapExactTokensForTokens(OKEX_kswapRouterAddr)

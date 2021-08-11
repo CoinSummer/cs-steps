@@ -72,12 +72,12 @@ module.exports = (app) => {
             // },
             CherrySwap_MasrerChef: {
                 name: "MasterChef",
-                jsonPath: `/Users/vanzhangxun/workspace/ethereum-toolbox/cs-steps/abis/okex/CherrySwap/MasterChef.json`,
+                jsonPath: `./abis/okex/CherrySwap/MasterChef.json`,
                 address: "0x8cddb4cd757048c4380ae6a69db8cd5597442f7b",
             },
             CherrySwap_SwapRouter: {
                 name: "SwapRouter",
-                jsonPath: `/Users/vanzhangxun/workspace/ethereum-toolbox/cs-steps/abis/okex/CherrySwap/SwapRouter.json`,
+                jsonPath: `./abis/okex/CherrySwap/SwapRouter.json`,
                 address: "0x865bfde337C8aFBffF144Ff4C29f9404EBb22b15",
             },
         }

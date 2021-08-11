@@ -314,9 +314,11 @@ class Bee extends BaseApp {
             if (msgData.function) {
                console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice) 
             } else {
-                console.log("===>", msgData.name, msgData.pid, msgData.gasPrice) 
-                // if (msgData.name === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
-                if (msgData.name === 'addLiquidity' && parseInt(msgData.pid) === 2) {
+                console.log("===>", msgData.name, msgData.pid, msgData.gasPrice, msgData.tx) 
+                if (msgData.name === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
+                // if (msgData.name === 'addLiquidity' && parseInt(msgData.pid) === 2) {
+                    await this.havest(LP_TokenAddr, 2, msgData.gasPrice)
+                } else if (msgData.name === 'removeLiquidityWithPermit' && parseInt(msgData.pid) === 2) {
                     await this.havest(LP_TokenAddr, 2, msgData.gasPrice)
                 }
             }
@@ -373,7 +375,7 @@ async function run() {
 
         // await app.deposit(LP_TokenAddr, 2)
 
-        // await app.havest(LP_TokenAddr, 2)
+        // ls await app.havest(LP_TokenAddr, 2)
 
         // await app.xSwapExactTokensForTokens(OKEX_kswapRouterAddr)
 

@@ -205,7 +205,7 @@ class Bee extends BaseApp {
             { value: 0, gasPrice, gas: 3000000 }) 
     }
 
-    async havest(lpTokenAddress, pid) {
+    async havest(lpTokenAddress, pid, gasPrice1) {
         const tokenLP = this.tokens[lpTokenAddress]
         const appMasterChef = this.apps['MasterChef']
         
@@ -249,11 +249,12 @@ class Bee extends BaseApp {
             [this.address, swapRaw, 0],
         ]
 
+        const gp = gasPrice1 ? parseFloat(gasPrice1) * Gwei : gasPrice
         return await this.methodSend(
             'xProxySteps', 
             [steps],
             this.owner, 
-            { value: 0, gasPrice, gas: 30000000 }) 
+            { value: 0, gasPrice: gp, gas: 30000000 }) 
     }
 
     async xProxySteps(poolAddress) {
@@ -314,8 +315,9 @@ class Bee extends BaseApp {
                console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice) 
             } else {
                 console.log("===>", msgData.name, msgData.pid, msgData.gasPrice) 
-                if (msgData.name === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
-                    await this.havest(LP_TokenAddr, 2)
+                // if (msgData.name === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
+                if (msgData.name === 'addLiquidity' && parseInt(msgData.pid) === 2) {
+                    await this.havest(LP_TokenAddr, 2, msgData.gasPrice)
                 }
             }
         } catch (e) {

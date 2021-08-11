@@ -310,9 +310,13 @@ class Bee extends BaseApp {
     async msgHandle(message) {
         const msgData = JSON.parse(message)
         try {
-            console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice)
-            if (msgData.function === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
-                await this.havest(LP_TokenAddr, 2)
+            if (msgData.function) {
+               console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice) 
+            } else {
+                console.log("===>", msgData.name, msgData.pid, msgData.gasPrice) 
+                if (msgData.name === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
+                    await this.havest(LP_TokenAddr, 2)
+                }
             }
         } catch (e) {
             console.log(e)

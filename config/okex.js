@@ -3,8 +3,8 @@
 module.exports = (app) => {
     return  {
         homeDir: app.homeDir,
-        // url: 'https://exchainrpc.okex.org',
-        url: 'http://localhost:26657',
+        url: 'https://exchainrpc.okex.org',
+        // url: 'http://localhost:26657',
         tokens: {
             "WETH": {
                 symbol: 'WETH',

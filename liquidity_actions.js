@@ -9,15 +9,17 @@ const BN = require('bignumber.js')
 const { toWei, numberToHex, leftPad } = require('web3-utils')
 
 // ==================================================================================== |
-// PASSWORD='CsOkEX!23$' ENV=okex SUBMIT=N node main
+// PASSWORD='CsOkEX!23$' ENV=okex SUBMIT=N node liquidity_actions
 // --------------------- Config Params ------------------------------------------------ +
 
 const MyAddress            = '0x82deec6f97572b4a1d457778328a45aa72cbf9f2'
-const OKEX_kswapRouterAddr = '0xc3364A27f56b95f4bEB0742a7325D67a04D80942' 
-const OKEX_LiquidityPool   = '0xaEBa5C691aF30b7108D9C277d6BB47347387Dc13'
-const OKEX_lpTokenAddr     = '0x84ee6a98990010fe87d2c79822763fca584418e9'
-const OKEX_TokenUSDTAddr   = '0x382bB369d343125BfB2117af9c149795C6C65C50'
-const OKEX_TokenKstAddr    = '0xab0d1578216a545532882e420a8c61ea07b00b12' 
+const SwapRouter           = 'CherrySwap_SwapRouter' 
+const MasterChef           = 'CherrySwap_MasrerChef'
+const TokenA               = 'CHE'
+const TokenB               = 'USDT' 
+
+const LP_TokenAddr     = '0x089dedbfd12f2ad990c55a2f1061b8ad986bff88'
+
 const GasPriceGwei = 0.1
 
 // ------------------------------------------------------------------------------------ |
@@ -38,6 +40,10 @@ class BaseApp extends ContractApp {
 
         this.apps = {}
         this.tokens = {}
+    }
+
+    async transferOwnership(owner) {
+        await this.methodSend('transferOwnership', [owner], this.owner, { gasPrice: this.gasPrice, gas: 3000000 })
     }
 
     async openWorkerMode() {
@@ -107,13 +113,26 @@ class Bee extends BaseApp {
             { value: 0, gasPrice, gas: 3000000 })
     }
 
-    loadContract(contractName, address) {
+    loadContractFromConfig(contractName, key) {
         const app = new ContractApp(this.util, this.config)
-        const JsonData = require(`./abis/steps/${contractName}.json`)
-        const contractWrapper = new ContractWrapper(this.util.eth, JsonData.abi, address)
+
+        const appConf = this.config.contracts[contractName]
+        const AbiJsonData = require(appConf.jsonPath)
+        const contractWrapper = new ContractWrapper(this.util.eth, AbiJsonData.abi, appConf.address)
         app.setContractWrapper(contractWrapper)
-        app.setAddress(address)
-        this.apps[String(address).toLocaleLowerCase()] = app
+        app.setAddress(appConf.address)
+        this.apps[key] = app
+    }
+
+    loadTokenFromConfig(tokenName) {
+        const app = new ContractApp(this.util, this.config)
+
+        const tokenConf = this.config.tokens[tokenName]
+        const AbiJsonData = require(tokenConf.jsonPath)
+        const contractWrapper = new ContractWrapper(this.util.eth, AbiJsonData.abi, tokenConf.address)
+        app.setContractWrapper(contractWrapper)
+        app.setAddress(tokenConf.address)
+        this.tokens[tokenName] = app
     }
 
     loadToken(address) {
@@ -141,12 +160,19 @@ class Bee extends BaseApp {
 
     // = 1 stake 
     // 0xe2bbb1580000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000054377455623f8a6
-    async methodEncode(targetAddress, name, parmas) {
-        const addr = String(targetAddress).toLocaleLowerCase()
-        const app = this.apps[addr]
+    async methodEncode(appKey, name, parmas) {
+        const app = this.apps[appKey]
 
         return await app.funcEncode(name,  [...parmas])    
     }
+
+    // async methodEncode(targetAddress, name, parmas) {
+    //     const addr = String(targetAddress).toLocaleLowerCase()
+    //     const app = this.apps[addr]
+
+    //     return await app.funcEncode(name,  [...parmas])    
+    // }
+
     async methodEncodeToken(targetAddress, name, parmas) {
         const addr = String(targetAddress).toLocaleLowerCase()
         const app = this.tokens[addr]
@@ -162,14 +188,14 @@ class Bee extends BaseApp {
             { value: 0, gasPrice, gas: 3000000 }) 
     }
 
-    async deposit(lpTokenAddress, lPoolAddress, pid) {
+    async deposit(lpTokenAddress, pid) {
         const tokenLP = this.tokens[lpTokenAddress]
         const balance =  await tokenLP.methodCall('balanceOf', [this.address])
         console.log(balance)
-        const depositRaw = await this.methodEncode(lPoolAddress, 'deposit', [pid, balance])
+        const depositRaw = await this.methodEncode('MasterChef', 'deposit', [pid, balance])
         console.log(depositRaw)
         const steps = [
-            [lPoolAddress, depositRaw, 0],  // deposit
+            [this.apps['MasterChef'].address, depositRaw, 0],  // deposit
         ]
 
         return await this.methodSend(
@@ -179,32 +205,46 @@ class Bee extends BaseApp {
             { value: 0, gasPrice, gas: 3000000 }) 
     }
 
-    async step2(lpTokenAddress, lPoolAddress, pid, routerAddress, tokenAAddr, tokenBAddr) {
+    async havest(lpTokenAddress, pid) {
         const tokenLP = this.tokens[lpTokenAddress]
-        const app = this.apps[String(lPoolAddress).toLocaleLowerCase()]
+        const appMasterChef = this.apps['MasterChef']
         
-        const userInfo = await app.methodCall('userInfo', [pid, MyAddress])
+        const userInfo = await appMasterChef.methodCall('userInfo', [pid, this.address])
         console.log(userInfo)
         const amount = userInfo.amount
         // rewardDebt: '1360865814891197234',
         // accKstAmount: '975901324112876'
 
-        // const withdrawRaw = await this.methodEncode(lPoolAddress, 'emergencyWithdraw', [pid])
-        const withdrawRaw = await this.methodEncode(lPoolAddress, 'withdraw', [pid, amount])
+        const withdrawRaw = await this.methodEncode('MasterChef', 'withdraw', [pid, amount])
         // console.log(withdrawRaw)
 
-        const trfRaw = await this.funcEncode('transferERC20From',  [lpTokenAddress, MyAddress, this.address, amount])    
+        // const trfRaw = await this.funcEncode('transferERC20From',  [lpTokenAddress, MyAddress, this.address, amount])    
 
         // const balance =  await tokenLP.methodCall('balanceOf', [this.address])
-        // const removeLiquidityRaw = await this.funcEncode(routerAddress, 'removeLiquidity', [tokenBAddr, tokenAAddr, balance, 0, 0, this.address, parseInt(Date.now()/1000 + 60)])
-        const removeLiquidityRaw = await this.funcEncode('xRemoveLiquidity', [routerAddress, tokenAAddr, tokenBAddr, amount, 0, 0, lpTokenAddress])
+        const removeLiquidityRaw = await this.funcEncode('xRemoveLiquidity', [
+            this.apps['SwapRouter'].address, 
+            this.tokens[TokenA].address, 
+            this.tokens[TokenB].address, 
+            amount, 
+            // toWei('10', 'ether'),
+            0, 
+            0, 
+            lpTokenAddress
+        ])
 
         const swapRaw = await this.funcEncode('xSwapExactTokensForTokens', 
-            [routerAddress, ['0xab0d1578216a545532882e420a8c61ea07b00b12', '0x382bB369d343125BfB2117af9c149795C6C65C50'], 0, 0, this.address, parseInt(Date.now()/1000 + 60)])
+            [
+                this.apps['SwapRouter'].address, 
+                [this.tokens[TokenA].address, this.tokens[TokenB].address], 
+                0, 
+                0, 
+                this.address, 
+                parseInt(Date.now()/1000 + 60)
+            ])
        
         const steps = [
-            [lPoolAddress, withdrawRaw, 0],  // 
-            [this.address, trfRaw, 0],
+            [this.apps['MasterChef'].address, withdrawRaw, 0],  // 
+            // [this.address, trfRaw, 0],
             [this.address, removeLiquidityRaw, 0],  // removeLiquidity
             [this.address, swapRaw, 0],
         ]
@@ -272,7 +312,7 @@ class Bee extends BaseApp {
         try {
             console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice)
             if (msgData.function === 'withdraw' && parseInt(msgData.pid) === 6) {
-                await this.step2(OKEX_lpTokenAddr, OKEX_LiquidityPool, 6, OKEX_kswapRouterAddr, OKEX_TokenKstAddr, OKEX_TokenUSDTAddr)
+                await this.havest(LP_TokenAddr, 2)
             }
         } catch (e) {
             console.log(e)
@@ -310,29 +350,34 @@ async function run() {
         loggerLoader({ mode: env, homeDir: __dirname })
 
         const util = new Util(config.url)
+        const app = new Bee(util, config, 'MultiAction', gasPrice)
 
-        const app = new Bee(util, config, 'IFOM', gasPrice)
+        app.loadContractFromConfig(SwapRouter, 'SwapRouter')
+        app.loadContractFromConfig(MasterChef, 'MasterChef')
 
-        app.loadContract('OKEX_LiquidityPool', OKEX_LiquidityPool)
-        app.loadContract('OKEX_KswapRouter',   OKEX_kswapRouterAddr)
-        app.loadToken(OKEX_lpTokenAddr)
+        app.loadTokenFromConfig(TokenA)
+        app.loadTokenFromConfig(TokenB)
+
+        app.loadToken(LP_TokenAddr)
         await app.subscribe('pending')
-        // await app.approve(OKEX_lpTokenAddr, OKEX_LiquidityPool)
-        // await app.approve(OKEX_lpTokenAddr, OKEX_kswapRouterAddr)
-        // await app.approve('0xab0d1578216a545532882e420a8c61ea07b00b12', OKEX_kswapRouterAddr)
+        // await app.approve(app.tokens[TokenA].address, app.apps['SwapRouter'].address)
+        // await app.approve(app.tokens[TokenB].address, app.apps['SwapRouter'].address)
+        // await app.approve(LP_TokenAddr, app.apps['SwapRouter'].address)
+        // await app.approve(LP_TokenAddr, app.apps['MasterChef'].address)
 
-        // await app.deposit('0x84ee6a98990010fe87d2c79822763fca584418e9', '0xaEBa5C691aF30b7108D9C277d6BB47347387Dc13', 1)
+        // await app.deposit(LP_TokenAddr, 2)
 
-        // await app.step2(OKEX_lpTokenAddr, OKEX_LiquidityPool, 6, OKEX_kswapRouterAddr, OKEX_TokenKstAddr, OKEX_TokenUSDTAddr)
+        // await app.havest(LP_TokenAddr, 2)
 
-        // await app.erc20Transfer('0xab0d1578216a545532882e420a8c61ea07b00b12', '975901324112876', '0xaD19E854b76BC971541002174d1CB8E5Bc1cea4a') 
         // await app.xSwapExactTokensForTokens(OKEX_kswapRouterAddr)
+
+        // await app.erc20Transfer(config.tokens['USDT'].address, toWei('30', 'ether'), '0x82deec6f97572b4a1d457778328a45aa72cbf9f2') 
 
         // await app.approveLpToken(OKEX_lpTokenAddr)
         // await app.xRemoveLiquidity(OKEX_kswapRouterAddr, OKEX_lpTokenAddr)
         
-        // await app.transferERC20From()
-        // await app.addWorkers([app.address])
+        // await app.transferOwnership('0x91F402f532498b52069d73C4fA672DD97f8d1b80')
+        // await app.addWorkers(['0x82deec6f97572b4a1d457778328a45aa72cbf9f2'])
     } catch (e) {
         console.error("deploy contract fail:", e)
     }

@@ -311,7 +311,7 @@ class Bee extends BaseApp {
         const msgData = JSON.parse(message)
         try {
             console.log("===>", msgData.symbol, msgData.function, msgData.gasPrice)
-            if (msgData.function === 'withdraw' && parseInt(msgData.pid) === 6) {
+            if (msgData.function === 'removeLiquidity' && parseInt(msgData.pid) === 2) {
                 await this.havest(LP_TokenAddr, 2)
             }
         } catch (e) {
